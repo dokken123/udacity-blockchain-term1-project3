@@ -1,83 +1,11 @@
+const BlockLevelDB = require("./BlockLevelDB");
+const Block = require("./Block");
+
 /* ===== SHA256 with Crypto-js ===============================
 |  Learn more: Crypto-js: https://github.com/brix/crypto-js  |
 |  =========================================================*/
 
 const SHA256 = require('crypto-js/sha256');
-const util = require('util')
-
-const level = require('level');
-const chainDB = './chaindata';
-const db = level(chainDB);
-
-
-/* ===== BlockLevelDB Class =======================
-|  LevelDB operation for block chain       			 |
-|  ===============================================*/
-class BlockLevelDB {
-  // Add data to levelDB with key/value pair
-  addLevelDBData(key,value, callback, errCallback){
-    db.put(key, JSON.stringify(value), function(err) {
-      if (err) {
-        console.log('Block ' + key + ' submission failed', err);
-        if (errCallback) {
-          callback(err);
-        }
-      };
-      if (callback) {
-        callback(true);
-      }
-    })
-  }
-  
-  // Get data from levelDB with key and callback value
-  getLevelDBData(key, callback, errCallback) {
-    db.get(key, function(err, value) {
-      if (!err) {
-        callback(JSON.parse(value));
-      } else {
-        console.log('err got when getting data: ', err)
-        if (errCallback) {
-          errCallback(err);
-        }
-      }
-    });
-  }
-
-  // Traverse data of entire blockchain
-  // Code Review 2017-07-29: Traverse tuning, do not store entire blockchain data
-  traversData(finishCallback, iterCallback, errCallback) {
-    let i = 0;
-    db.createReadStream().on('data', function(data) {
-          i++;
-          if (iterCallback) {
-            iterCallback(JSON.parse(data.value));
-          }
-        }).on('error', function(err) {
-          console.log('Unable to read data stream!', err)
-          if (errCallback) {
-            errCallback(err);
-          }
-        }).on('close', function() {
-          if (finishCallback) {
-            finishCallback(i);
-          }
-        });
-  }
-}
-
-/* ===== Block Class ==============================
-|  Class with a constructor for block 			   |
-|  ===============================================*/
-
-class Block{
-	constructor(data){
-     this.hash = "",
-     this.height = 0,
-     this.body = data,
-     this.time = 0,
-     this.previousBlockHash = ""
-    }
-}
 
 /* ===== Blockchain Class ==========================
 |  Class with a constructor for new blockchain 		|
@@ -107,7 +35,7 @@ class Blockchain{
   }
 
   // Add new block
-  addBlock(newBlock, callback){
+  addBlock(newBlock, callback, errCallback){
     console.log("Adding new block");
     let level = this.level;
     this.level.traversData(function(height) {
@@ -122,7 +50,7 @@ class Blockchain{
           // Block hash with SHA256 using newBlock and converting to a string
           newBlock.hash = SHA256(JSON.stringify(newBlock)).toString();
           // Adding block object to chain
-          level.addLevelDBData(newBlock.height, newBlock, callback);
+          level.addLevelDBData(newBlock.height, newBlock, callback, errCallback);
         })
       } else {
         // Block hash with SHA256 using newBlock and converting to a string
@@ -142,11 +70,11 @@ class Blockchain{
   }
 
   // get block
-  getBlock(blockHeight, callback){
+  getBlock(blockHeight, callback, errCallback){
     // return object as a single string
     this.level.getLevelDBData(blockHeight, function(block) {
       callback(block);
-    });
+    }, errCallback);
   }
 
   // validate block by height
@@ -206,39 +134,6 @@ class Blockchain{
       }
     });
   }
-}
+};
 
-let blockchain = new Blockchain(function(height) {
-
-  // Get Genesis block
-  console.log("1. Get genesis block data");
-  blockchain.getBlock(0, function(block) {
-    console.log(JSON.stringify(block));
-    
-    // add new Block
-    console.log("2. Add new block");
-    blockchain.addBlock(new Block("New test block at " + new Date().toString()), function(result) {
-      
-      let blockHeight = 0;
-      // get block height
-      console.log("3. Get current block height");
-      blockchain.getBlockHeight(function(height) {
-        blockHeight = height;
-        console.log("blockchain height: " + blockHeight);
-        // validate last block
-        console.log("4. Validate block at " + blockHeight);
-        blockchain.validateBlock(blockHeight, function(result) {
-          console.log(util.format("Block at %s validate status: %s", blockHeight, result));
-          // get last block data
-          console.log("5. Get block data at " + blockHeight);
-          blockchain.getBlock(blockHeight, function(block) {
-            console.log("Block at " + blockHeight + ": " + JSON.stringify(block));
-            // Validate blockchain
-            console.log("6. Validate entire block chain");
-            blockchain.validateChain();
-          });
-        });
-      });
-    });
-  });
-});
+module.exports = Blockchain;
