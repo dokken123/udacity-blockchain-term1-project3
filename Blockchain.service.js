@@ -23,11 +23,15 @@ app.get("/", (req, res) => {
 
 app.post("/block", (req,res) => {
     var block = req.body;
-    blockchain.addBlock(block, (retBlock) => {
-        res.send(retBlock);
-    }, (err) => {
-        res.send(err);
-    });
+    if (block.body == null || block.body == undefined) {
+        res.send({});
+    } else {
+        blockchain.addBlock(block, (retBlock) => {
+            res.send(retBlock);
+        }, (err) => {
+            res.send(err);
+        });
+    }
 });
 
 app.get("/block/:height", (req,res) => {
